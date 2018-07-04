@@ -1,0 +1,14 @@
+kafka:
+  common:
+    application.id: opennms-kafka-event-mirrorer
+    client.id: opennms-kafka-event-mirrorer-client
+  source:
+    bootstrap.servers: localhost:9092
+  target:
+    bootstrap.servers: other:9092
+traps:
+  enabled: true
+  source-topic: OpenNMS.Sink.Trap
+  target-topic: OpenNMS.Sink.Trap2
+  trap-type-oid-prefix:
+    - .1.3.6.1.2.1.15.7.2
