@@ -65,7 +65,8 @@ public class MirrorCommand implements Command {
     private File configFile = new File("~/.kem/config.yaml");
 
     private final MetricRegistry metrics = new MetricRegistry();
-    private final Meter trapMeter = metrics.meter("trapsMirrored");
+    private final Meter trapsMirrored = metrics.meter("trapsMirrored");
+    private final Meter trapsFiltered = metrics.meter("trapsFiltered");
 
     private KemConfig config;
     private String[] trapTypeOidPrefixes;
@@ -81,6 +82,9 @@ public class MirrorCommand implements Command {
                 // TODO: Optimize this using a radix tree or trie
                 .filter(t -> StringUtils.startsWithAny(t.getTrapIdentity().getEnterpriseId(), trapTypeOidPrefixes))
                 .collect(Collectors.toList());
+
+        // Track the number of traps we did not forward
+        trapsFiltered.mark(trapLogDTO.getMessages().size() - trapsToForward.size());
 
         // Nothing to forward?
         if (trapsToForward.size() < 1) {
@@ -134,7 +138,7 @@ public class MirrorCommand implements Command {
         trapLogDtoStream.filter((k,log) -> log != null)
                 .foreach((k,log) -> producer.send(new ProducerRecord<>(config.getTraps().getTargetTopic(), k, getTrapLogXmlHandler().marshal(log)), (metadata, exception) -> {
                     if (exception == null) {
-                        trapMeter.mark(log.getMessages().size());
+                        trapsMirrored.mark(log.getMessages().size());
                     }
                 }));
 
