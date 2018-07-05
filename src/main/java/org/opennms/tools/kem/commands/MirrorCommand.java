@@ -33,8 +33,10 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
@@ -75,15 +77,14 @@ public class MirrorCommand implements Command {
         final KemConfigDao configDao = new KemConfigDao(configFile);
         config = configDao.getConfig();
 
-
         final Properties sourceConfiguration = config.getKafka().getEffectiveSourceConfiguration();
         // Specify default (de)serializers for record keys and for record values.
         sourceConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         sourceConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
 
         final Properties targetConfiguration = config.getKafka().getEffectiveTargetConfiguration();
-        targetConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-        targetConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+        targetConfiguration.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getCanonicalName());
+        targetConfiguration.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getCanonicalName());
         final KafkaProducer<String,String> producer = new KafkaProducer<>(targetConfiguration);
 
         final StreamsBuilder builder = new StreamsBuilder();
@@ -98,9 +99,7 @@ public class MirrorCommand implements Command {
         });
         trapLogDtoStream.filter((k,log) -> log != null)
                 .mapValues((k,log) -> getTrapLogXmlHandler().marshal(log))
-                .foreach((k,xml) -> {
-                    producer.send(new ProducerRecord<>(config.getTraps().getTargetTopic(), k, xml));
-                });
+                .foreach((k,xml) -> producer.send(new ProducerRecord<>(config.getTraps().getTargetTopic(), k, xml)));
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), sourceConfiguration);
         streams.cleanUp();
