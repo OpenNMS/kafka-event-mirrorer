@@ -29,9 +29,12 @@
 package org.opennms.tools.kem.commands;
 
 import java.io.File;
+import java.util.List;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections4.Trie;
+import org.apache.commons.lang.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -43,6 +46,7 @@ import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.KStream;
 import org.kohsuke.args4j.Option;
 import org.opennms.core.xml.XmlHandler;
+import org.opennms.netmgt.trapd.TrapDTO;
 import org.opennms.netmgt.trapd.TrapLogDTO;
 import org.opennms.tools.kem.config.KemConfig;
 import org.opennms.tools.kem.config.KemConfigDao;
@@ -57,6 +61,7 @@ public class MirrorCommand implements Command {
     private File configFile = new File("~/.kem/config.yaml");
 
     private KemConfig config;
+    private String[] trapTypeOidPrefixes;
 
     /**
      * Unmarshalers are not thread-safe.
@@ -64,18 +69,40 @@ public class MirrorCommand implements Command {
     private final ThreadLocal<XmlHandler<TrapLogDTO>> trapLogXmlHandler = new ThreadLocal<>();
 
     private TrapLogDTO shouldForward(TrapLogDTO trapLogDTO) {
-        final String traps = trapLogDTO.getMessages().stream()
-                .map(m -> String.format("Trap[enterprise: %s, generic: %s, specific: %s]",
-                        m.getTrapIdentity().getEnterpriseId(), m.getTrapIdentity().getGeneric(), m.getTrapIdentity().getSpecific()))
-                .collect(Collectors.joining(","));
-        LOG.info("Forwarding trap log from {}: {}", trapLogDTO.getTrapAddress(), traps);
-        return trapLogDTO;
+        // Filter the traps
+        final List<TrapDTO> trapsToForward = trapLogDTO.getMessages().stream()
+                // TODO: Optimize this using a radix tree or trie
+                .filter(t -> StringUtils.startsWithAny(t.getTrapIdentity().getEnterpriseId(), trapTypeOidPrefixes))
+                .collect(Collectors.toList());
+
+        // Nothing to forward?
+        if (trapsToForward.size() < 1) {
+            return null;
+        }
+
+        // Rebuild the log
+        final TrapLogDTO filteredTrapLogDTO = new TrapLogDTO();
+        filteredTrapLogDTO.setLocation(trapLogDTO.getLocation());
+        filteredTrapLogDTO.setSystemId(trapLogDTO.getSystemId());
+        filteredTrapLogDTO.setTrapAddress(trapLogDTO.getTrapAddress());
+        filteredTrapLogDTO.setMessages(trapsToForward);
+
+        if (LOG.isInfoEnabled()) {
+            final String traps = trapLogDTO.getMessages().stream()
+                    .map(m -> String.format("Trap[enterprise: %s, generic: %s, specific: %s]",
+                            m.getTrapIdentity().getEnterpriseId(), m.getTrapIdentity().getGeneric(), m.getTrapIdentity().getSpecific()))
+                    .collect(Collectors.joining(","));
+            LOG.info("Forwarding trap log from {}: {}", trapLogDTO.getTrapAddress(), traps);
+        }
+
+        return filteredTrapLogDTO;
     }
 
     @Override
     public void execute() {
         final KemConfigDao configDao = new KemConfigDao(configFile);
         config = configDao.getConfig();
+        trapTypeOidPrefixes = config.getTraps().getTrapTypeOidPrefix().toArray(new String[0]);
 
         final Properties sourceConfiguration = config.getKafka().getEffectiveSourceConfiguration();
         // Specify default (de)serializers for record keys and for record values.
