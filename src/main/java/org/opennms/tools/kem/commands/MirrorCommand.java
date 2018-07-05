@@ -34,13 +34,10 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections4.Trie;
 import org.apache.commons.lang.StringUtils;
-import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
@@ -57,7 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.ConsoleReporter;
-import com.codahale.metrics.Counter;
+import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 
 public class MirrorCommand implements Command {
@@ -68,7 +65,7 @@ public class MirrorCommand implements Command {
     private File configFile = new File("~/.kem/config.yaml");
 
     private final MetricRegistry metrics = new MetricRegistry();
-    private final Counter requests = metrics.counter("traps");
+    private final Meter trapMeter = metrics.meter("trapsMirrored");
 
     private KemConfig config;
     private String[] trapTypeOidPrefixes;
@@ -137,7 +134,7 @@ public class MirrorCommand implements Command {
         trapLogDtoStream.filter((k,log) -> log != null)
                 .foreach((k,log) -> producer.send(new ProducerRecord<>(config.getTraps().getTargetTopic(), k, getTrapLogXmlHandler().marshal(log)), (metadata, exception) -> {
                     if (exception == null) {
-                        requests.inc(log.getMessages().size());
+                        trapMeter.mark(log.getMessages().size());
                     }
                 }));
 
