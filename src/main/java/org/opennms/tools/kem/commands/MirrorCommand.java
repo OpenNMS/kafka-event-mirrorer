@@ -31,13 +31,16 @@ package org.opennms.tools.kem.commands;
 import java.io.File;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.Trie;
 import org.apache.commons.lang.StringUtils;
+import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
@@ -53,12 +56,19 @@ import org.opennms.tools.kem.config.KemConfigDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.ConsoleReporter;
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.MetricRegistry;
+
 public class MirrorCommand implements Command {
 
     private static final Logger LOG = LoggerFactory.getLogger(MirrorCommand.class);
 
     @Option(name = "-c", usage = "yaml configuration", metaVar = "CONFIG")
     private File configFile = new File("~/.kem/config.yaml");
+
+    private final MetricRegistry metrics = new MetricRegistry();
+    private final Counter requests = metrics.counter("traps");
 
     private KemConfig config;
     private String[] trapTypeOidPrefixes;
@@ -87,12 +97,12 @@ public class MirrorCommand implements Command {
         filteredTrapLogDTO.setTrapAddress(trapLogDTO.getTrapAddress());
         filteredTrapLogDTO.setMessages(trapsToForward);
 
-        if (LOG.isInfoEnabled()) {
+        if (LOG.isDebugEnabled()) {
             final String traps = trapLogDTO.getMessages().stream()
                     .map(m -> String.format("Trap[enterprise: %s, generic: %s, specific: %s]",
                             m.getTrapIdentity().getEnterpriseId(), m.getTrapIdentity().getGeneric(), m.getTrapIdentity().getSpecific()))
                     .collect(Collectors.joining(","));
-            LOG.info("Forwarding trap log from {}: {}", trapLogDTO.getTrapAddress(), traps);
+            LOG.debug("Forwarding trap log from {}: {}", trapLogDTO.getTrapAddress(), traps);
         }
 
         return filteredTrapLogDTO;
@@ -125,15 +135,28 @@ public class MirrorCommand implements Command {
             }
         });
         trapLogDtoStream.filter((k,log) -> log != null)
-                .mapValues((k,log) -> getTrapLogXmlHandler().marshal(log))
-                .foreach((k,xml) -> producer.send(new ProducerRecord<>(config.getTraps().getTargetTopic(), k, xml)));
+                .foreach((k,log) -> producer.send(new ProducerRecord<>(config.getTraps().getTargetTopic(), k, getTrapLogXmlHandler().marshal(log)), (metadata, exception) -> {
+                    if (exception == null) {
+                        requests.inc(log.getMessages().size());
+                    }
+                }));
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), sourceConfiguration);
         streams.cleanUp();
         streams.start();
 
+        final ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build();
+        reporter.start(10, TimeUnit.SECONDS);
+
         // Add shutdown hook to respond to SIGTERM and gracefully close Kafka Streams
-        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            streams.close();
+            producer.close();
+            reporter.close();
+        }));
     }
 
     private XmlHandler<TrapLogDTO> getTrapLogXmlHandler() {
