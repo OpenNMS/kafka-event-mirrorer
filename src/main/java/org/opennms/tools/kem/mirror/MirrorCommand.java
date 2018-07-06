@@ -76,6 +76,9 @@ public class MirrorCommand implements Command {
         if (config.getTraps().isEnabled()) {
             mirrorers.add(new TrapSinkModuleMirrorer(metrics, config.getTraps()));
         }
+        if (config.getSyslog().isEnabled()) {
+            mirrorers.add(new SyslogSinkModuleMirrorer(metrics, config.getSyslog()));
+        }
 
         if (mirrorers.size() < 1) {
             System.out.println("No modules enabled. Exiting.");
