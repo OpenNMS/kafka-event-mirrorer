@@ -33,8 +33,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.spi.SubCommand;
 import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
-import org.opennms.tools.kem.commands.Command;
-import org.opennms.tools.kem.commands.MirrorCommand;
+import org.opennms.tools.kem.mirror.MirrorCommand;
 
 /**
  * Entry point.

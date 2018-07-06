@@ -28,19 +28,26 @@
 
 package org.opennms.tools.kem.config;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class Traps {
+public class Syslog {
     @JsonProperty("enabled")
     private boolean enabled;
     @JsonProperty("source-topic")
     private String sourceTopic;
     @JsonProperty("target-topic")
     private String targetTopic;
-    @JsonProperty("trap-type-oid-prefix")
-    private List<String> trapTypeOidPrefix;
+    @JsonProperty("exclude-messages-matching")
+    private List<String> excludeMessagesMatching = new ArrayList<>();
+    @JsonProperty("exclude-messages-containing")
+    private List<String> excludeMessagesContaining = new ArrayList<>();
+    @JsonProperty("include-messages-matching")
+    private List<String> includeMessagesMatching = new ArrayList<>();
+    @JsonProperty("include-messages-containing")
+    private List<String> includeMessagesContaining = new ArrayList<>();
 
     public boolean isEnabled() {
         return enabled;
@@ -66,11 +73,35 @@ public class Traps {
         this.targetTopic = targetTopic;
     }
 
-    public List<String> getTrapTypeOidPrefix() {
-        return trapTypeOidPrefix;
+    public List<String> getExcludeMessagesMatching() {
+        return excludeMessagesMatching;
     }
 
-    public void setTrapTypeOidPrefix(List<String> trapTypeOidPrefix) {
-        this.trapTypeOidPrefix = trapTypeOidPrefix;
+    public void setExcludeMessagesMatching(List<String> excludeMessagesMatching) {
+        this.excludeMessagesMatching = excludeMessagesMatching;
+    }
+
+    public List<String> getExcludeMessagesContaining() {
+        return excludeMessagesContaining;
+    }
+
+    public void setExcludeMessagesContaining(List<String> excludeMessagesContaining) {
+        this.excludeMessagesContaining = excludeMessagesContaining;
+    }
+
+    public List<String> getIncludeMessagesMatching() {
+        return includeMessagesMatching;
+    }
+
+    public void setIncludeMessagesMatching(List<String> includeMessagesMatching) {
+        this.includeMessagesMatching = includeMessagesMatching;
+    }
+
+    public List<String> getIncludeMessagesContaining() {
+        return includeMessagesContaining;
+    }
+
+    public void setIncludeMessagesContaining(List<String> includeMessagesContaining) {
+        this.includeMessagesContaining = includeMessagesContaining;
     }
 }

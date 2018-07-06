@@ -26,15 +26,14 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.tools.kem.commands;
+package org.opennms.tools.kem.mirror;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -45,16 +44,14 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.KStream;
 import org.kohsuke.args4j.Option;
-import org.opennms.core.xml.XmlHandler;
-import org.opennms.netmgt.trapd.TrapDTO;
-import org.opennms.netmgt.trapd.TrapLogDTO;
+import org.opennms.core.ipc.sink.api.Message;
+import org.opennms.tools.kem.Command;
 import org.opennms.tools.kem.config.KemConfig;
 import org.opennms.tools.kem.config.KemConfigDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.ConsoleReporter;
-import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 
 public class MirrorCommand implements Command {
@@ -65,55 +62,25 @@ public class MirrorCommand implements Command {
     private File configFile = new File("~/.kem/config.yaml");
 
     private final MetricRegistry metrics = new MetricRegistry();
-    private final Meter trapsMirrored = metrics.meter("trapsMirrored");
-    private final Meter trapsFiltered = metrics.meter("trapsFiltered");
 
     private KemConfig config;
-    private String[] trapTypeOidPrefixes;
 
-    /**
-     * Unmarshalers are not thread-safe.
-     */
-    private final ThreadLocal<XmlHandler<TrapLogDTO>> trapLogXmlHandler = new ThreadLocal<>();
+    private List<XmlSinkModuleMirrorer<? extends Message>> mirrorers = new ArrayList<>();
 
-    private TrapLogDTO shouldForward(TrapLogDTO trapLogDTO) {
-        // Filter the traps
-        final List<TrapDTO> trapsToForward = trapLogDTO.getMessages().stream()
-                // TODO: Optimize this using a radix tree or trie
-                .filter(t -> StringUtils.startsWithAny(t.getTrapIdentity().getEnterpriseId(), trapTypeOidPrefixes))
-                .collect(Collectors.toList());
-
-        // Track the number of traps we did not forward
-        trapsFiltered.mark(trapLogDTO.getMessages().size() - trapsToForward.size());
-
-        // Nothing to forward?
-        if (trapsToForward.size() < 1) {
-            return null;
-        }
-
-        // Rebuild the log
-        final TrapLogDTO filteredTrapLogDTO = new TrapLogDTO();
-        filteredTrapLogDTO.setLocation(trapLogDTO.getLocation());
-        filteredTrapLogDTO.setSystemId(trapLogDTO.getSystemId());
-        filteredTrapLogDTO.setTrapAddress(trapLogDTO.getTrapAddress());
-        filteredTrapLogDTO.setMessages(trapsToForward);
-
-        if (LOG.isDebugEnabled()) {
-            final String traps = trapLogDTO.getMessages().stream()
-                    .map(m -> String.format("Trap[enterprise: %s, generic: %s, specific: %s]",
-                            m.getTrapIdentity().getEnterpriseId(), m.getTrapIdentity().getGeneric(), m.getTrapIdentity().getSpecific()))
-                    .collect(Collectors.joining(","));
-            LOG.debug("Forwarding trap log from {}: {}", trapLogDTO.getTrapAddress(), traps);
-        }
-
-        return filteredTrapLogDTO;
-    }
 
     @Override
     public void execute() {
         final KemConfigDao configDao = new KemConfigDao(configFile);
         config = configDao.getConfig();
-        trapTypeOidPrefixes = config.getTraps().getTrapTypeOidPrefix().toArray(new String[0]);
+
+        if (config.getTraps().isEnabled()) {
+            mirrorers.add(new TrapSinkModuleMirrorer(metrics, config.getTraps()));
+        }
+
+        if (mirrorers.size() < 1) {
+            System.out.println("No modules enabled. Exiting.");
+            return;
+        }
 
         final Properties sourceConfiguration = config.getKafka().getEffectiveSourceConfiguration();
         // Specify default (de)serializers for record keys and for record values.
@@ -126,21 +93,24 @@ public class MirrorCommand implements Command {
         final KafkaProducer<String,String> producer = new KafkaProducer<>(targetConfiguration);
 
         final StreamsBuilder builder = new StreamsBuilder();
-        final KStream<String, String> trapXmlStream = builder.stream(config.getTraps().getSourceTopic());
-        final KStream<String, TrapLogDTO> trapLogDtoStream = trapXmlStream.mapValues((k,xml) -> {
-            try {
-                return shouldForward(getTrapLogXmlHandler().unmarshal(xml));
-            } catch (Exception e) {
-                LOG.error("Failed to unmarshal XML. Skipping record. Value: {}", xml, e);
-                return null;
-            }
-        });
-        trapLogDtoStream.filter((k,log) -> log != null)
-                .foreach((k,log) -> producer.send(new ProducerRecord<>(config.getTraps().getTargetTopic(), k, getTrapLogXmlHandler().marshal(log)), (metadata, exception) -> {
-                    if (exception == null) {
-                        trapsMirrored.mark(log.getMessages().size());
-                    }
-                }));
+        for (XmlSinkModuleMirrorer<?> mirrorer : mirrorers) {
+            final KStream<String, String> xmlStream = builder.stream(mirrorer.getSourceTopic());
+            final KStream<String, Message> messageStream = xmlStream.mapValues((k,xml) -> {
+                try {
+                    final Message m = mirrorer.unmarshal(xml);
+                    return mirrorer.mapIfNeedsForwarding(m);
+                } catch (Exception e) {
+                    LOG.error("Failed to unmarshal XML. Skipping record. Value: {}", xml, e);
+                    return null;
+                }
+            });
+            messageStream.filter((k,m) -> m != null)
+                    .foreach((k,m) -> producer.send(new ProducerRecord<>(mirrorer.getTargetTopic(), k, mirrorer.marshal(m)), (metadata, exception) -> {
+                        if (exception == null) {
+                            mirrorer.messagesForwarded.mark(mirrorer.getNumMessagesIn(m));
+                        }
+                    }));
+        }
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), sourceConfiguration);
         streams.cleanUp();
@@ -159,27 +129,4 @@ public class MirrorCommand implements Command {
             reporter.close();
         }));
     }
-
-    private XmlHandler<TrapLogDTO> getTrapLogXmlHandler() {
-        XmlHandler<TrapLogDTO> xmlHandler = trapLogXmlHandler.get();
-        if (xmlHandler == null) {
-            xmlHandler = createXmlHandler(TrapLogDTO.class);
-            trapLogXmlHandler.set(xmlHandler);
-        }
-        return xmlHandler;
-    }
-
-    private <W> XmlHandler<W> createXmlHandler(Class<W> clazz) {
-        try {
-            return new XmlHandler<>(clazz);
-        } catch (Throwable t) {
-            // NMS-8793: This is a work-around for some failure in the Minion container
-            // When invoked for the first time, the creation may fail due to
-            // errors of the form "invalid protocol handler: mvn", but subsequent
-            // calls always seem to work
-            LOG.warn("Creating the XmlHandler failed. Retrying.", t);
-            return new XmlHandler<>(clazz);
-        }
-    }
-
 }

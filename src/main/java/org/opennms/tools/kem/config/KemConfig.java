@@ -31,6 +31,7 @@ package org.opennms.tools.kem.config;
 public class KemConfig {
     private Kafka kafka;
     private Traps traps;
+    private Syslog syslog;
 
     public Kafka getKafka() {
         return kafka;
@@ -46,5 +47,13 @@ public class KemConfig {
 
     public void setTraps(Traps traps) {
         this.traps = traps;
+    }
+
+    public Syslog getSyslog() {
+        return syslog;
+    }
+
+    public void setSyslog(Syslog syslog) {
+        this.syslog = syslog;
     }
 }

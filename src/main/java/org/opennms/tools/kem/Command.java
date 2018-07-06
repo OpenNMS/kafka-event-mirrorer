@@ -26,7 +26,7 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.tools.kem.commands;
+package org.opennms.tools.kem;
 
 public interface Command {
     void execute() throws Exception;
