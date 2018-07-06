@@ -34,12 +34,9 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang.StringUtils;
 import org.opennms.core.ipc.sink.api.Message;
 import org.opennms.netmgt.syslogd.api.SyslogMessageDTO;
 import org.opennms.netmgt.syslogd.api.SyslogMessageLogDTO;
-import org.opennms.netmgt.trapd.TrapDTO;
-import org.opennms.netmgt.trapd.TrapLogDTO;
 import org.opennms.tools.kem.config.Syslog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +45,7 @@ import com.codahale.metrics.MetricRegistry;
 
 public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessageLogDTO> {
     private static final Logger LOG = LoggerFactory.getLogger(TrapSinkModuleMirrorer.class);
+    private final static Pattern MAX_MIN_THRESHOLD_XML_PATTERN = Pattern.compile("<max.*Min>", Pattern.DOTALL | Pattern.MULTILINE);
 
     private final Syslog config;
 
@@ -136,6 +134,11 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
     public long getNumMessagesIn(Message message) {
         final SyslogMessageLogDTO syslogMessageLogDTO = (SyslogMessageLogDTO)message;
         return syslogMessageLogDTO.getMessages().size();
+    }
+
+    @Override
+    public SyslogMessageLogDTO unmarshal(String xml) {
+        return super.unmarshal(MAX_MIN_THRESHOLD_XML_PATTERN.matcher(xml).replaceAll(""));
     }
 
     @Override
