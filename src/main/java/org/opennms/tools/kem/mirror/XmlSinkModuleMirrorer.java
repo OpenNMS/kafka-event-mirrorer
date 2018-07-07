@@ -35,6 +35,7 @@ import org.opennms.core.xml.XmlHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 
@@ -49,11 +50,13 @@ public abstract class XmlSinkModuleMirrorer<M extends Message> {
     private final Class<M> clazz;
     protected final Meter messagesFiltered;
     protected final Meter messagesForwarded;
+    protected final Histogram messageSizes;
 
     public XmlSinkModuleMirrorer(MetricRegistry metrics, Class<M> clazz, String name) {
         this.clazz = Objects.requireNonNull(clazz);
         messagesFiltered = metrics.meter(name + "Filtered");
         messagesForwarded = metrics.meter(name + "Forwarded");
+        messageSizes = metrics.histogram(name + "MessageSizes");
     }
 
     public abstract String getSourceTopic();
@@ -67,6 +70,7 @@ public abstract class XmlSinkModuleMirrorer<M extends Message> {
     }
 
     public M unmarshal(String content) {
+        messageSizes.update(content.length());
         return getXmlHandler().unmarshal(content);
     }
 

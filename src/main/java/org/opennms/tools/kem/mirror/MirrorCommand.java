@@ -29,6 +29,7 @@
 package org.opennms.tools.kem.mirror;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -59,19 +60,16 @@ public class MirrorCommand implements Command {
     private static final Logger LOG = LoggerFactory.getLogger(MirrorCommand.class);
 
     @Option(name = "-c", usage = "yaml configuration", metaVar = "CONFIG")
-    private File configFile = new File("~/.kem/config.yaml");
+    private File configFile = Paths.get(System.getProperty("user.home"), ".kem", "config.yaml").toFile();
 
     private final MetricRegistry metrics = new MetricRegistry();
 
-    private KemConfig config;
-
     private List<XmlSinkModuleMirrorer<? extends Message>> mirrorers = new ArrayList<>();
-
 
     @Override
     public void execute() {
         final KemConfigDao configDao = new KemConfigDao(configFile);
-        config = configDao.getConfig();
+        final KemConfig config = configDao.getConfig();
 
         if (config.getTraps().isEnabled()) {
             mirrorers.add(new TrapSinkModuleMirrorer(metrics, config.getTraps()));
