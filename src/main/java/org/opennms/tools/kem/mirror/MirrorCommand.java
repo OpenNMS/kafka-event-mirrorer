@@ -32,7 +32,11 @@ import java.io.File;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -65,6 +69,8 @@ public class MirrorCommand implements Command {
     private final MetricRegistry metrics = new MetricRegistry();
 
     private List<XmlSinkModuleMirrorer<? extends Message>> mirrorers = new ArrayList<>();
+
+    private Map<XmlSinkModuleMirrorer<? extends Message>, String> lastXmlMessage = new ConcurrentHashMap<>();
 
     @Override
     public void execute() {
@@ -99,6 +105,7 @@ public class MirrorCommand implements Command {
             final KStream<String, Message> messageStream = xmlStream.mapValues((k,xml) -> {
                 try {
                     final Message m = mirrorer.unmarshal(xml);
+                    lastXmlMessage.put(mirrorer, xml);
                     return mirrorer.mapIfNeedsForwarding(m);
                 } catch (Exception e) {
                     LOG.error("Failed to unmarshal XML. Skipping record. Value: {}", xml, e);
@@ -123,11 +130,22 @@ public class MirrorCommand implements Command {
                 .build();
         reporter.start(10, TimeUnit.SECONDS);
 
+        final Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                lastXmlMessage.forEach((m,xml) -> {
+                    System.out.printf("\nLast message in '%s':\n%s\n\n", m.getSourceTopic(), xml);
+                });
+            }
+        }, TimeUnit.SECONDS.toMillis(10), TimeUnit.SECONDS.toMillis(10));
+
         // Add shutdown hook to respond to SIGTERM and gracefully close Kafka Streams
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             streams.close();
             producer.close();
             reporter.close();
+            timer.cancel();
         }));
     }
 }
