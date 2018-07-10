@@ -135,9 +135,14 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
             }
         }
 
+        String effectiveLocation = syslogMessageLogDTO.getLocation();
+        if (config.getLocationOverride() != null) {
+            effectiveLocation = config.getLocationOverride();
+        }
+
         // Rebuild the log
         final SyslogMessageLogDTO filteredSyslogMessageLogDTO = new SyslogMessageLogDTO();
-        filteredSyslogMessageLogDTO.setLocation(syslogMessageLogDTO.getLocation());
+        filteredSyslogMessageLogDTO.setLocation(effectiveLocation);
         filteredSyslogMessageLogDTO.setSystemId(syslogMessageLogDTO.getSystemId());
         filteredSyslogMessageLogDTO.setSourceAddress(sourceAddressOverride != null ? sourceAddressOverride : syslogMessageLogDTO.getSourceAddress());
         filteredSyslogMessageLogDTO.setSourcePort(syslogMessageLogDTO.getSourcePort());

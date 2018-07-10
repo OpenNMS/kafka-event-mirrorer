@@ -35,6 +35,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class Traps {
     @JsonProperty("enabled")
     private boolean enabled;
+    @JsonProperty("location-override")
+    private String locationOverride;
     @JsonProperty("source-topic")
     private String sourceTopic;
     @JsonProperty("target-topic")
@@ -48,6 +50,14 @@ public class Traps {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getLocationOverride() {
+        return locationOverride;
+    }
+
+    public void setLocationOverride(String locationOverride) {
+        this.locationOverride = locationOverride;
     }
 
     public String getSourceTopic() {
