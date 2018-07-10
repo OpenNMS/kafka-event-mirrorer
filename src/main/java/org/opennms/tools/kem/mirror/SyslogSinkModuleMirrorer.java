@@ -28,9 +28,14 @@
 
 package org.opennms.tools.kem.mirror;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -46,6 +51,7 @@ import com.codahale.metrics.MetricRegistry;
 public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessageLogDTO> {
     private static final Logger LOG = LoggerFactory.getLogger(TrapSinkModuleMirrorer.class);
     private final static Pattern MAX_MIN_THRESHOLD_XML_PATTERN = Pattern.compile("<max.*Min>", Pattern.DOTALL | Pattern.MULTILINE);
+    private final static Pattern SOURCE_ADDRESS_PATTERN = Pattern.compile(".*(\\nsource_address=(.*))$", Pattern.DOTALL | Pattern.MULTILINE);
 
     private final Syslog config;
 
@@ -112,11 +118,28 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
             return null;
         }
 
+        // Unmangle the syslog messages
+        InetAddress sourceAddressOverride = null;
+        for (SyslogMessageDTO msg : messagesToForward) {
+            String content = new String(msg.getBytes().array(), StandardCharsets.UTF_8);
+            final Matcher m = SOURCE_ADDRESS_PATTERN.matcher(content);
+            if (m.matches()) {
+                try {
+                    sourceAddressOverride = InetAddress.getByName(m.group(2));
+                } catch (UnknownHostException e) {
+                    LOG.warn("Failed to get source address from: {}", m.group(2));
+                }
+                // Truncate the message and update the DTO
+                content = content.substring(0, m.start(1));
+                msg.setBytes(ByteBuffer.wrap(content.getBytes(StandardCharsets.UTF_8)));
+            }
+        }
+
         // Rebuild the log
         final SyslogMessageLogDTO filteredSyslogMessageLogDTO = new SyslogMessageLogDTO();
         filteredSyslogMessageLogDTO.setLocation(syslogMessageLogDTO.getLocation());
         filteredSyslogMessageLogDTO.setSystemId(syslogMessageLogDTO.getSystemId());
-        filteredSyslogMessageLogDTO.setSourceAddress(syslogMessageLogDTO.getSourceAddress());
+        filteredSyslogMessageLogDTO.setSourceAddress(sourceAddressOverride != null ? sourceAddressOverride : syslogMessageLogDTO.getSourceAddress());
         filteredSyslogMessageLogDTO.setSourcePort(syslogMessageLogDTO.getSourcePort());
         filteredSyslogMessageLogDTO.setMessages(messagesToForward);
 
@@ -127,7 +150,7 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
             LOG.debug("Forwarding syslog message log from {}: {}", filteredSyslogMessageLogDTO.getSourceAddress(), syslogs);
         }
 
-        return syslogMessageLogDTO;
+        return filteredSyslogMessageLogDTO;
     }
 
     @Override
