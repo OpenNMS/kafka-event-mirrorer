@@ -51,7 +51,7 @@ import com.codahale.metrics.MetricRegistry;
 public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessageLogDTO> {
     private static final Logger LOG = LoggerFactory.getLogger(TrapSinkModuleMirrorer.class);
     private final static Pattern MAX_MIN_THRESHOLD_XML_PATTERN = Pattern.compile("<max.*Min>", Pattern.DOTALL | Pattern.MULTILINE);
-    private final static Pattern SOURCE_ADDRESS_PATTERN = Pattern.compile(".*(\\nsource_address=(.*))$", Pattern.DOTALL | Pattern.MULTILINE);
+    private final static Pattern SOURCE_ADDRESS_PATTERN = Pattern.compile(".*(\\s*source_address=(.*))\\s*$", Pattern.DOTALL | Pattern.MULTILINE);
 
     private final Syslog config;
 
