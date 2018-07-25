@@ -28,59 +28,37 @@
 
 package org.opennms.tools.kem.config;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class Traps {
-    @JsonProperty("enabled")
-    private boolean enabled;
-    @JsonProperty("location-override")
-    private String locationOverride;
-    @JsonProperty("source-topic")
-    private String sourceTopic;
-    @JsonProperty("target-topic")
-    private String targetTopic;
-    @JsonProperty("include-traps-with")
-    private List<TrapCriteria> trapCriteria;
+public class TrapCriteria {
+    @JsonProperty("enterprise")
+    private String enterprise;
+    @JsonProperty("generic")
+    private Integer generic;
+    @JsonProperty("specific")
+    private Integer specific;
 
-    public boolean isEnabled() {
-        return enabled;
+    public String getEnterprise() {
+        return enterprise;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+    public void setEnterprise(String enterprise) {
+        this.enterprise = enterprise;
     }
 
-    public String getLocationOverride() {
-        return locationOverride;
+    public Integer getGeneric() {
+        return generic;
     }
 
-    public void setLocationOverride(String locationOverride) {
-        this.locationOverride = locationOverride;
+    public void setGeneric(Integer generic) {
+        this.generic = generic;
     }
 
-    public String getSourceTopic() {
-        return sourceTopic;
+    public Integer getSpecific() {
+        return specific;
     }
 
-    public void setSourceTopic(String sourceTopic) {
-        this.sourceTopic = sourceTopic;
-    }
-
-    public String getTargetTopic() {
-        return targetTopic;
-    }
-
-    public void setTargetTopic(String targetTopic) {
-        this.targetTopic = targetTopic;
-    }
-
-    public List<TrapCriteria> getTrapCriteria() {
-        return trapCriteria;
-    }
-
-    public void setTrapCriteria(List<TrapCriteria> trapCriteria) {
-        this.trapCriteria = trapCriteria;
+    public void setSpecific(Integer specific) {
+        this.specific = specific;
     }
 }

@@ -28,17 +28,21 @@
 
 package org.opennms.tools.kem.mirror;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang.StringUtils;
 import org.opennms.core.ipc.sink.api.Message;
 import org.opennms.netmgt.trapd.TrapDTO;
+import org.opennms.netmgt.trapd.TrapIdentityDTO;
 import org.opennms.netmgt.trapd.TrapLogDTO;
+import org.opennms.tools.kem.config.TrapCriteria;
 import org.opennms.tools.kem.config.Traps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.snmp4j.smi.OID;
 
 import com.codahale.metrics.MetricRegistry;
 
@@ -46,12 +50,12 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
     private static final Logger LOG = LoggerFactory.getLogger(TrapSinkModuleMirrorer.class);
 
     private final Traps config;
-    private final String[] trapTypeOidPrefixes;
+    private final List<Predicate<TrapIdentityDTO>> matchers;
 
     public TrapSinkModuleMirrorer(MetricRegistry metrics, Traps config) {
         super(metrics, TrapLogDTO.class, "traps");
         this.config = Objects.requireNonNull(config);
-        trapTypeOidPrefixes = config.getTrapTypeOidPrefix().toArray(new String[0]);
+        matchers = toPredicates(config.getTrapCriteria());
     }
 
     @Override
@@ -60,8 +64,7 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
 
         // Filter the traps
         final List<TrapDTO> trapsToForward = trapLogDTO.getMessages().stream()
-                // TODO: Optimize this using a radix tree or trie
-                .filter(t -> StringUtils.startsWithAny(t.getTrapIdentity().getEnterpriseId(), trapTypeOidPrefixes))
+                .filter(t -> matchers.stream().anyMatch(p -> p.test(t.getTrapIdentity())))
                 .collect(Collectors.toList());
 
         // Track the number of traps we did not forward
@@ -94,6 +97,27 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
         }
 
         return filteredTrapLogDTO;
+    }
+
+    private static List<Predicate<TrapIdentityDTO>> toPredicates(List<TrapCriteria> trapCriteria) {
+        final List<Predicate<TrapIdentityDTO>> matchers = new ArrayList<>(trapCriteria.size());
+        for (TrapCriteria criteria : trapCriteria) {
+            final OID enterpriseOid = criteria.getEnterprise() != null ? new OID(criteria.getEnterprise()) : null;
+            if (enterpriseOid == null && criteria.getGeneric() == null && criteria.getSpecific() == null) {
+                // All null, skip it
+                continue;
+            }
+            matchers.add(trapIdentityDTO -> {
+                if (enterpriseOid != null && !Objects.equals(enterpriseOid, new OID(trapIdentityDTO.getEnterpriseId()))) {
+                    return false;
+                }
+                if (criteria.getGeneric() != null && criteria.getGeneric() != trapIdentityDTO.getGeneric()) {
+                    return false;
+                }
+                return criteria.getSpecific() == null || criteria.getSpecific() == trapIdentityDTO.getSpecific();
+            });
+        }
+        return matchers;
     }
 
     @Override
