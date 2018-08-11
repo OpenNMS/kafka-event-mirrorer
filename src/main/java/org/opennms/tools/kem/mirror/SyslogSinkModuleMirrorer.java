@@ -67,7 +67,7 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
         excludePatterns = config.getExcludeMessagesMatching().stream()
                 .map(Pattern::compile)
                 .collect(Collectors.toList());
-        includePatterns = config.getIncludeMessagesContaining().stream()
+        includePatterns = config.getIncludeMessagesMatching().stream()
                 .map(Pattern::compile)
                 .collect(Collectors.toList());
         excludeContaining = config.getExcludeMessagesContaining();
