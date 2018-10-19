@@ -8,6 +8,7 @@ kafka:
     bootstrap.servers: other:9092
 traps:
   enabled: true
+  system-id-override: 00000000-0000-0000-0000-000000000000
   location-override: Default
   source-topic: OpenNMS.Sink.Trap
   target-topic: OpenNMS.Sink.Trap2
@@ -17,6 +18,7 @@ traps:
       specific: 6
 syslog:
   enabled: true
+  system-id-override: 00000000-0000-0000-0000-000000000000
   location-override: Default
   source-topic: OpenNMS.Sink.Syslog
   target-topic: OpenNMS.Sink.Syslog2

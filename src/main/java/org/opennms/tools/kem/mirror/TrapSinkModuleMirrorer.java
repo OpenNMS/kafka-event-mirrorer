@@ -75,6 +75,12 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
             return null;
         }
 
+        // Optionally override the system id
+        String effectiveSystemId = trapLogDTO.getSystemId();
+        if (config.getSystemIdOverride() != null) {
+            effectiveSystemId = config.getSystemIdOverride();
+        }
+
         // Optionally override the location
         String effectiveLocation = trapLogDTO.getLocation();
         if (config.getLocationOverride() != null) {
@@ -84,7 +90,7 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
         // Rebuild the log
         final TrapLogDTO filteredTrapLogDTO = new TrapLogDTO();
         filteredTrapLogDTO.setLocation(effectiveLocation);
-        filteredTrapLogDTO.setSystemId(trapLogDTO.getSystemId());
+        filteredTrapLogDTO.setSystemId(effectiveSystemId);
         filteredTrapLogDTO.setTrapAddress(trapLogDTO.getTrapAddress());
         filteredTrapLogDTO.setMessages(trapsToForward);
 

@@ -35,6 +35,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class Traps {
     @JsonProperty("enabled")
     private boolean enabled;
+    @JsonProperty("system-id-override")
+    private String systemIdOverride;
     @JsonProperty("location-override")
     private String locationOverride;
     @JsonProperty("source-topic")
@@ -50,6 +52,14 @@ public class Traps {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getSystemIdOverride() {
+        return systemIdOverride;
+    }
+
+    public void setSystemIdOverride(String systemIdOverride) {
+        this.systemIdOverride = systemIdOverride;
     }
 
     public String getLocationOverride() {
