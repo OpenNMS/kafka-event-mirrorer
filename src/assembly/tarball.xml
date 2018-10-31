@@ -1,0 +1,46 @@
+<assembly
+    xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
+  <id>minion</id>
+  <formats>
+    <format>tar.gz</format>
+  </formats>
+  <includeBaseDirectory>true</includeBaseDirectory>
+  <fileSets>
+    <!-- assembly plugin does not overwrite files, so the "overlay" goes *first* -->
+    <fileSet>
+      <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${project.build.directory}/filtered-resources</directory>
+      <outputDirectory></outputDirectory>
+    </fileSet>
+  </fileSets>
+  <files>
+    <file>
+      <source>${project.build.directory}/filtered-resources/etc/${project.name}.init</source>
+      <outputDirectory>etc</outputDirectory>
+      <fileMode>0755</fileMode>
+      <filtered>true</filtered>
+    </file>
+    <file>
+      <source>${project.basedir}/src/test/resources/config.yaml</source>
+      <outputDirectory>etc</outputDirectory>
+      <destName>example-config.yaml</destName>
+      <fileMode>0640</fileMode>
+      <filtered>false</filtered>
+    </file>
+    <file>
+      <source>${project.build.directory}/unpacked/opennms-source-${opennms.version}/opennms-${opennms.version}/opennms-base-assembly/src/main/filtered/bin/find-java.sh</source>
+      <outputDirectory>bin</outputDirectory>
+      <fileMode>0755</fileMode>
+      <filtered>false</filtered>
+    </file>
+    <file>
+      <source>${project.build.directory}/${project.name}-${project.version}-jar-with-dependencies.jar</source>
+      <outputDirectory>lib</outputDirectory>
+      <destName>${project.name}.jar</destName>
+      <fileMode>0644</fileMode>
+      <filtered>false</filtered>
+    </file>
+  </files>
+</assembly>
