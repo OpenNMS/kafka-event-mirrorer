@@ -2,13 +2,34 @@
 
 This utility is used to mirror a subset of the events (syslogs & traps) from one Kafka cluster (or topic) to another.
 
-## Running
+## Building
 
 Compile the project with:
 
 ```
 mvn clean package
 ```
+
+## Creating Packages
+
+First, build using `mvn clean package` as noted above.  Then:
+
+### Debian
+
+```
+cd target
+tar -xvzf kafka-event-mirrorer-1.0.0-SNAPSHOT.tar.gz
+cd kafka-event-mirrorer-1.0.0-SNAPSHOT
+dpkg-buildpackage
+```
+
+### RPM
+
+```
+rpmbuild -tb target/kafka-event-mirrorer-1.0.0-SNAPSHOT.tar.gz
+```
+
+## Running
 
 Run using:
 
