@@ -31,7 +31,6 @@ Requires(pre): /usr/sbin/useradd
 Requires(pre): /sbin/nologin
 Requires:      /sbin/nologin
 Requires:      %{onms_java}
-BuildRequires: %{onms_java}
 
 %description
 This package contains a tool for forwarding OpenNMS events from one
@@ -52,12 +51,14 @@ install -d -m 755 "%{buildroot}%{onms_sysconfdir}"
 install -d -m 755 "%{buildroot}%{_initrddir}"
 sed -e 's,@INSTPREFIX@,%{onms_instprefix},g' \
 	-e 's,@SYSCONFDIR@,%{onms_sysconfdir},g' \
+	-e 's,^.*PIDFILE=.*$,PIDFILE=/var/lib/%{name}/%{name}.pid,' \
 	etc/%{name}.init > "%{buildroot}%{_initrddir}/%{name}"
 
 sed -e 's,@INSTPREFIX@,%{onms_instprefix},g' \
 	-e 's,@SYSCONFDIR@,%{onms_sysconfdir},g' \
-	-e 's,^.*RUNAS=.*$,RUNAS=opennms-kem,' \
 	-e 's,^.*CONFFILE=.*$,CONFFILE=/etc/%{name}.yaml,' \
+	-e 's,^.*PIDFILE=.*$,# PIDFILE=/var/lib/%{name}/%{name}.pid,' \
+	-e 's,^.*RUNAS=.*$,RUNAS=opennms-kem,' \
 	etc/%{name}.conf > "%{buildroot}%{onms_sysconfdir}/%{name}"
 
 chmod 755 "%{buildroot}%{_initrddir}/%{name}"
@@ -80,4 +81,5 @@ getent group opennms-kem >/dev/null || groupadd -r opennms-kem
 getent passwd opennms-kem >/dev/null || \
 	useradd -r -g opennms-kem -d "%{onms_instprefix}" -s /sbin/nologin \
 	-c "OpenNMS Karaf Event Mirrorer" opennms-kem
+install -d -m 755 -o opennms-kem -g opennms-kem /var/lib/%{name}
 exit 0

@@ -30,11 +30,13 @@ override_dh_install:
 	install -d -m 755 debian/kafka-event-mirrorer/etc/default
 	sed -e 's,@INSTPREFIX@,/usr/share/kafka-event-mirrorer,g' \
 		-e 's,@SYSCONFDIR@,/etc/default,g' \
+		-e 's,^.*PIDFILE=.*$$,PIDFILE=/var/lib/kafka-event-mirrorer/kafka-event-mirrorer.pid,' \
 		etc/kafka-event-mirrorer.init > debian/kafka-event-mirrorer.init
 	sed -e 's,@INSTPREFIX@,/usr/share/kafka-event-mirrorer,g' \
 		-e 's,@SYSCONFDIR@,/etc/default,g' \
-		-e 's,^.*RUNAS=.*$$,RUNAS=debian-opennms-kem,' \
 		-e 's,^.*CONFFILE=.*$$,CONFFILE=/etc/kafka-event-mirrorer.yaml,' \
+		-e 's,^.*PIDFILE=.*$$,# PIDFILE=/var/lib/kafka-event-mirrorer/kafka-event-mirrorer.pid,' \
+		-e 's,^.*RUNAS=.*$$,RUNAS=debian-opennms-kem,' \
 		etc/kafka-event-mirrorer.conf > debian/kafka-event-mirrorer/etc/default/kafka-event-mirrorer
 	chmod 0755 debian/kafka-event-mirrorer.init
 	chmod 0640 debian/kafka-event-mirrorer/etc/default/kafka-event-mirrorer

@@ -28,8 +28,13 @@
 
 package org.opennms.tools.kem;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.lang.management.ManagementFactory;
+
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.SubCommand;
 import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
@@ -40,11 +45,35 @@ import org.opennms.tools.kem.mirror.MirrorCommand;
  */
 public class App {
 
+    @Option(name="-p", usage="write a PID file")
+    File pidFile;
+
     @Argument(handler=SubCommandHandler.class)
     @SubCommands({
             @SubCommand(name="mirror", impl=MirrorCommand.class)
     })
     Command cmd;
+
+    private void writePid() {
+        if (pidFile != null) {
+            pidFile.getParentFile().mkdirs();
+            FileWriter writer = null;
+            try {
+                String pid = ManagementFactory.getRuntimeMXBean().getName().split("@")[0];
+                if (pid != null) {
+                    writer = new FileWriter(pidFile);
+                    writer.write(pid);
+                }
+            } catch (final Exception e) {
+                throw new RuntimeException("Failed to write PID to " + pidFile, e);
+            } finally {
+                try {
+                    writer.close();
+                } catch (final Exception e) {
+                }
+            }
+        }
+    }
 
     public static void main(String[] args) {
         App app = new App();
@@ -54,6 +83,8 @@ public class App {
             if (app.cmd == null) {
                 throw new Exception("Command required.");
             }
+
+            app.writePid();
             app.cmd.execute();
         } catch (Exception e) {
             System.err.println(e.getMessage());

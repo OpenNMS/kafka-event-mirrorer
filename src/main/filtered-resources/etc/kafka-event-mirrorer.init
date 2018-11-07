@@ -17,13 +17,17 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+BOOTUP=quiet
 NAME="kafka-event-mirrorer"
 DESC="Kafka Event Mirrorer"
 APP_PREFIX="@INSTPREFIX@"
 SYSCONFDIR="@SYSCONFDIR@"
+STOP_RETRIES=3
+STOP_WAIT=10
 
 RUNAS="root"
-PIDFILE="@PIDFILE@"
+PIDFILE="$APP_PREFIX/run/$NAME.pid"
+LOGFILE="@LOGFILE@"
 
 if [ -f /lib/lsb/init-functions ]; then
 	# shellcheck disable=SC1090,SC1091
@@ -36,26 +40,26 @@ if [ -f /etc/rc.d/init.d/functions ]; then
 fi
 
 if [ -z "$JAVA_HOME" ]; then
-	JAVA_HOME="$("${APP_PREFIX}/bin/find-java.sh" 1.8.0 1.8.9999)"
+	JAVA_HOME="$("$APP_PREFIX/bin/find-java.sh" 1.8.0 1.8.9999)"
 fi
 
-if [ -r "${SYSCONFDIR}/${NAME}" ]; then
+if [ -r "$SYSCONFDIR/$NAME" ]; then
 	# shellcheck disable=SC1090,SC1091
-	. "${SYSCONFDIR}/${NAME}"
+	. "$SYSCONFDIR/$NAME"
 fi
 
-if [ ! -r "${CONFFILE}" ] && [ -r "${APP_PREFIX}/etc/config.yaml" ]; then
-	CONFFILE="${APP_PREFIX}/etc/config.yaml"
+if [ ! -r "$CONFFILE" ] && [ -r "$APP_PREFIX/etc/config.yaml" ]; then
+	CONFFILE="$APP_PREFIX/etc/config.yaml"
 fi
 
-if [ ! -r "${CONFFILE}" ] && [ -r "/etc/${NAME}.yaml" ]; then
-	CONFFILE="/etc/${NAME}.yaml"
+if [ ! -r "$CONFFILE" ] && [ -r "/etc/$NAME.yaml" ]; then
+	CONFFILE="/etc/$NAME.yaml"
 fi
 
-if [ ! -r "${CONFFILE}" ]; then
-	user_homedir="$(getent passwd "${RUNAS}" | cut -d: -f6)"
-	if [ -r "${user_homedir}/.kem/config.yaml" ]; then
-		CONFFILE="${user_homedir}/.kem/config.yaml"
+if [ ! -r "$CONFFILE" ]; then
+	user_homedir="$(getent passwd "$RUNAS" | cut -d: -f6)"
+	if [ -r "$user_homedir/.kem/config.yaml" ]; then
+		CONFFILE="$user_homedir/.kem/config.yaml"
 	fi
 fi
 
@@ -63,44 +67,51 @@ fi
 DEFAULT_JAVA_OPTS="-XX:+HeapDumpOnOutOfMemoryError"
 
 # combine user JAVA_OPTS with our defaults
-JAVA_OPTS="${DEFAULT_JAVA_OPTS} ${JAVA_OPTS}"
+JAVA_OPTS="$DEFAULT_JAVA_OPTS $JAVA_OPTS"
 
 # export any default configurable variables from sysconf
-export JAVA_HOME JAVA_OPTS LD_LIBRARY_PATH
+export APP_PREFIX BOOTUP JAVA_HOME JAVA_OPTS LD_LIBRARY_PATH LOGFILE PIDFILE RUNAS SYSCONFDIR
 
-run_as() {
-	if [ "$(id -n -u)" "!=" "${RUNAS}" ]; then
-		DAEMON="$(daemon --user="${RUNAS}" true >/dev/null 2>&1 && command -v daemon)"
-		START_STOP_DAEMON="$(command -v start-stop-daemon)"
-		RUNUSER="$(runuser -u "${RUNAS}" true 2>/dev/null && command -v runuser)"
-		if [ -n "${START_STOP_DAEMON}" ]; then
-				"${START_STOP_DAEMON}" --pidfile="${PIDFILE}" --background --make-pidfile --user "${RUNAS}" "$@"
-		elif [ -n "${DAEMON}" ]; then
-			"${DAEMON}" --user="${RUNAS}" "$@" &
-			echo "$!" > "${PIDFILE}"
-		elif [ -n "${RUNUSER}" ] && [ -x "${RUNUSER}" ]; then
-			"${RUNUSER}" -u "${RUNAS}" "$@" &
-			echo "$!" > "${PIDFILE}"
+run_java() {
+	DAEMON="$(daemon --user="$RUNAS" true >/dev/null 2>&1 && command -v daemon)"
+	START_STOP_DAEMON="$(command -v start-stop-daemon)"
+	RUNUSER="$(runuser -u "$RUNAS" true 2>/dev/null && command -v runuser)"
+	JAVA="$JAVA_HOME/bin/java"
+	if [ "$(id -n -u)" "!=" "$RUNAS" ]; then
+		if [ -n "$START_STOP_DAEMON" ]; then
+			# shellcheck disable=SC2086
+			"$START_STOP_DAEMON" --start --background --pidfile "$PIDFILE" --user "$RUNAS" --chuid "$RUNAS" --no-close --exec "$JAVA" -- $JAVA_OPTS "$@" >"$LOGFILE" 2>&1
+		elif [ -n "$DAEMON" ]; then
+			"$DAEMON" --user="$RUNAS" "$JAVA_HOME/bin/java" "$@" >"$LOGFILE" 2>&1 &
+		elif [ -n "$RUNUSER" ] && [ -x "$RUNUSER" ]; then
+			"$RUNUSER" -u "$RUNAS" "$@" >"$LOGFILE" 2>&1 &
 		else
-			/usr/bin/sudo -u "${RUNAS}" "$@" &
-			echo "$!" > "${PIDFILE}"
+			# shellcheck disable=SC2024
+			/usr/bin/sudo -u "$RUNAS" "$@" >"$LOGFILE" 2>&1 &
 		fi
 	else
-		exec "$@"
+		if [ -n "$START_STOP_DAEMON" ]; then
+			# shellcheck disable=SC2086
+			"$START_STOP_DAEMON" --start --background --pidfile "$PIDFILE" --no-close --exec "$JAVA" -- $JAVA_OPTS "$@" >"$LOGFILE" 2>&1
+		elif [ -n "$DAEMON" ]; then
+			"$DAEMON" "$@" >"$LOGFILE" 2>&1 &
+		else
+			"$@" >"$LOGFILE" 2>&1 &
+		fi
 	fi
 }
 
 get_pid() {
 	MY_PID=0
-	if [ -f "${PIDFILE}" ]; then
-		MY_PID="$(cat "${PIDFILE}")"
+	if [ -f "$PIDFILE" ]; then
+		MY_PID="$(cat "$PIDFILE")"
 	fi
 	echo "$MY_PID"
 }
 
 is_running() {
 	PID=$(get_pid)
-	if [ "${PID}" -ne "0" ] && ps p "$PID" > /dev/null; then
+	if [ "$PID" -ne "0" ] && ps p "$PID" > /dev/null; then
 		return 0
 	fi
 	return 1
@@ -113,7 +124,7 @@ kill_process() {
 	fi
 	PID=$(get_pid)
 	if [ "$PID" -gt 0 ]; then
-		kill $SIGNAL "$PID"
+		kill $SIGNAL "$PID" >/dev/null 2>&1
 	fi
 }
 
@@ -131,7 +142,16 @@ case "$COMMAND" in
 			echo "$DESC: no configuration found."
 			exit 6 # 6 = LSB "not configured"
 		fi
-		run_as "${JAVA_HOME}/bin/java" -jar "${APP_PREFIX}/lib/kafka-event-mirrorer.jar" mirror -c "$CONFFILE"
+		printf "Starting %s: " "$DESC"
+		run_java -jar "$APP_PREFIX/lib/kafka-event-mirrorer.jar" -p "$PIDFILE" mirror -c "$CONFFILE"
+		sleep 1
+		if is_running; then
+			echo "OK"
+			exit 0
+		else
+			echo "FAILED"
+			exit 7
+		fi
 		;;
 
 	stop)
@@ -139,7 +159,9 @@ case "$COMMAND" in
 			printf "Stopping %s: " "$DESC"
 			STOP_ATTEMPTS=0
 			while [ "$STOP_ATTEMPTS" -lt "$STOP_RETRIES" ]; do
-				kill_process
+				if is_running; then
+					kill_process
+				fi
 				if is_running; then
 					STOP_ATTEMPTS="$((STOP_ATTEMPTS + 1))"
 					sleep "$STOP_WAIT"
@@ -188,19 +210,16 @@ case "$COMMAND" in
 		;;
 
 	status)
-		RETVAL=0
-		if is_container; then
-			run_as "${APP_PREFIX}"/bin/status >/dev/null
-			RETVAL="$?"
-		else
-			RETVAL=is_running
-		fi
-		if [ $RETVAL -eq 0 ]; then
+		if is_running; then
 			echo "$DESC is running."
 			exit 0
 		else
 			echo "$DESC is stopped."
-			exit 3
+			if [ -e "$PIDFILE" ]; then
+				exit 1
+			else
+				exit 3
+			fi
 		fi
 		;;
 
