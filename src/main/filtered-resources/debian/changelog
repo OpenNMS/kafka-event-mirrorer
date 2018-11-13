@@ -1,0 +1,5 @@
+kafka-event-mirrorer (@project.version@-1) unstable; urgency=medium
+
+  * Debian package for the Kafka event mirrorer.
+
+ -- Benjamin Reed <ranger@opennms.org>  Wed, 24 Oct 2018 15:36:24 -0400

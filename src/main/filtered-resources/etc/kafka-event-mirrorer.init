@@ -1,0 +1,230 @@
+#!/bin/sh -
+#
+# chkconfig:   345 99 01
+# description: Starts and stops the Kafka Event Mirrorer
+# processname: java
+#
+### BEGIN INIT INFO
+# Provides:	  kafka-event-mirrorer
+# Required-Start:    $network $remote_fs
+# Required-Stop:     $network $remote_fs
+# Should-Start:      $local_fs
+# Should-Stop:       $local_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Kafka Event Mirrorer
+# Description:       OpenNMS Kafka Event Mirrorer
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+BOOTUP=quiet
+NAME="kafka-event-mirrorer"
+DESC="Kafka Event Mirrorer"
+APP_PREFIX="@INSTPREFIX@"
+SYSCONFDIR="@SYSCONFDIR@"
+STOP_RETRIES=3
+STOP_WAIT=10
+
+RUNAS="root"
+PIDFILE="$APP_PREFIX/run/$NAME.pid"
+LOGFILE="@LOGFILE@"
+
+if [ -f /lib/lsb/init-functions ]; then
+	# shellcheck disable=SC1090,SC1091
+	. /lib/lsb/init-functions
+fi
+
+if [ -f /etc/rc.d/init.d/functions ]; then
+	# shellcheck disable=SC1090,SC1091
+	. /etc/rc.d/init.d/functions
+fi
+
+if [ -z "$JAVA_HOME" ]; then
+	JAVA_HOME="$("$APP_PREFIX/bin/find-java.sh" 1.8.0 1.8.9999)"
+fi
+
+if [ -r "$SYSCONFDIR/$NAME" ]; then
+	# shellcheck disable=SC1090,SC1091
+	. "$SYSCONFDIR/$NAME"
+fi
+
+if [ ! -r "$CONFFILE" ] && [ -r "$APP_PREFIX/etc/config.yaml" ]; then
+	CONFFILE="$APP_PREFIX/etc/config.yaml"
+fi
+
+if [ ! -r "$CONFFILE" ] && [ -r "/etc/$NAME.yaml" ]; then
+	CONFFILE="/etc/$NAME.yaml"
+fi
+
+if [ ! -r "$CONFFILE" ]; then
+	user_homedir="$(getent passwd "$RUNAS" | cut -d: -f6)"
+	if [ -r "$user_homedir/.kem/config.yaml" ]; then
+		CONFFILE="$user_homedir/.kem/config.yaml"
+	fi
+fi
+
+# always dump heap if we OOM
+DEFAULT_JAVA_OPTS="-XX:+HeapDumpOnOutOfMemoryError"
+
+# combine user JAVA_OPTS with our defaults
+JAVA_OPTS="$DEFAULT_JAVA_OPTS $JAVA_OPTS"
+
+# export any default configurable variables from sysconf
+export APP_PREFIX BOOTUP JAVA_HOME JAVA_OPTS LD_LIBRARY_PATH LOGFILE PIDFILE RUNAS SYSCONFDIR
+
+run_java() {
+	DAEMON="$(daemon --user="$RUNAS" true >/dev/null 2>&1 && command -v daemon)"
+	START_STOP_DAEMON="$(command -v start-stop-daemon)"
+	RUNUSER="$(runuser -u "$RUNAS" true 2>/dev/null && command -v runuser)"
+	JAVA="$JAVA_HOME/bin/java"
+	if [ "$(id -n -u)" "!=" "$RUNAS" ]; then
+		if [ -n "$START_STOP_DAEMON" ]; then
+			# shellcheck disable=SC2086
+			"$START_STOP_DAEMON" --start --background --pidfile "$PIDFILE" --user "$RUNAS" --chuid "$RUNAS" --no-close --exec "$JAVA" -- $JAVA_OPTS "$@" >"$LOGFILE" 2>&1
+		elif [ -n "$DAEMON" ]; then
+			"$DAEMON" --user="$RUNAS" "$JAVA_HOME/bin/java" "$@" >"$LOGFILE" 2>&1 &
+		elif [ -n "$RUNUSER" ] && [ -x "$RUNUSER" ]; then
+			"$RUNUSER" -u "$RUNAS" "$@" >"$LOGFILE" 2>&1 &
+		else
+			# shellcheck disable=SC2024
+			/usr/bin/sudo -u "$RUNAS" "$@" >"$LOGFILE" 2>&1 &
+		fi
+	else
+		if [ -n "$START_STOP_DAEMON" ]; then
+			# shellcheck disable=SC2086
+			"$START_STOP_DAEMON" --start --background --pidfile "$PIDFILE" --no-close --exec "$JAVA" -- $JAVA_OPTS "$@" >"$LOGFILE" 2>&1
+		elif [ -n "$DAEMON" ]; then
+			"$DAEMON" "$@" >"$LOGFILE" 2>&1 &
+		else
+			"$@" >"$LOGFILE" 2>&1 &
+		fi
+	fi
+}
+
+get_pid() {
+	MY_PID=0
+	if [ -f "$PIDFILE" ]; then
+		MY_PID="$(cat "$PIDFILE")"
+	fi
+	echo "$MY_PID"
+}
+
+is_running() {
+	PID=$(get_pid)
+	if [ "$PID" -ne "0" ] && ps p "$PID" > /dev/null; then
+		return 0
+	fi
+	return 1
+}
+
+kill_process() {
+	SIGNAL="$1"
+	if [ -z "$SIGNAL" ]; then
+		SIGNAL="-15"
+	fi
+	PID=$(get_pid)
+	if [ "$PID" -gt 0 ]; then
+		kill $SIGNAL "$PID" >/dev/null 2>&1
+	fi
+}
+
+COMMAND="$1"; shift
+
+case "$COMMAND" in
+
+	start)
+		if is_running; then
+			echo "$DESC is running."
+			exit 0
+		fi
+
+		if [ ! -r "$CONFFILE" ]; then
+			echo "$DESC: no configuration found."
+			exit 6 # 6 = LSB "not configured"
+		fi
+		printf "Starting %s: " "$DESC"
+		run_java -jar "$APP_PREFIX/lib/kafka-event-mirrorer.jar" -p "$PIDFILE" mirror -c "$CONFFILE"
+		sleep 1
+		if is_running; then
+			echo "OK"
+			exit 0
+		else
+			echo "FAILED"
+			exit 7
+		fi
+		;;
+
+	stop)
+		if is_running; then
+			printf "Stopping %s: " "$DESC"
+			STOP_ATTEMPTS=0
+			while [ "$STOP_ATTEMPTS" -lt "$STOP_RETRIES" ]; do
+				if is_running; then
+					kill_process
+				fi
+				if is_running; then
+					STOP_ATTEMPTS="$((STOP_ATTEMPTS + 1))"
+					sleep "$STOP_WAIT"
+				else
+					echo "OK"
+					exit 0
+				fi
+			done
+			echo "FAILED"
+
+			printf "Force-killing %s: " "$DESC"
+			kill_process -9
+			if is_running; then
+				echo "FAILED"
+				exit 1
+			fi
+			echo "OK"
+			exit 0
+		else
+			echo "$DESC is not running."
+			exit 0 # LSB specifies calling "stop" on a stopped service is still a success
+		fi
+		;;
+
+	restart)
+		$0 stop >/dev/null 2>&1
+		sleep 2
+		$0 start
+		exit $?
+		;;
+
+	try-restart)
+		if is_running; then
+			echo "$DESC is not running."
+			exit 0
+		else
+			$0 restart
+			exit $?
+		fi
+		;;
+
+
+	force-reload)
+		$0 try-restart
+		exit $?
+		;;
+
+	status)
+		if is_running; then
+			echo "$DESC is running."
+			exit 0
+		else
+			echo "$DESC is stopped."
+			if [ -e "$PIDFILE" ]; then
+				exit 1
+			else
+				exit 3
+			fi
+		fi
+		;;
+
+	*)
+		echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}" >&2
+		exit 1
+		;;
+esac
