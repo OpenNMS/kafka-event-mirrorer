@@ -1,4 +1,4 @@
-# Kafka Event Mirrorer
+# Kafka Event Mirrorer [![CircleCI](https://circleci.com/gh/OpenNMS/kafka-event-mirrorer.svg?style=svg)](https://circleci.com/gh/OpenNMS/kafka-event-mirrorer)
 
 This utility is used to mirror a subset of the events (syslogs & traps) from one Kafka cluster (or topic) to another.
 
