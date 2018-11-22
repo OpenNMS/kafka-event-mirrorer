@@ -28,9 +28,6 @@
 
 package org.opennms.tools.kem.eval;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.hasSize;
-
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -62,7 +59,6 @@ public class EvalCommand implements Command {
         if (!config.getSyslog().isEnabled()) {
             System.out.println("Syslog is disabled. Nothing to evaluate.");
             return;
-
         }
 
         final SyslogSinkModuleMirrorer mirrorer = new SyslogSinkModuleMirrorer(new MetricRegistry(), config.getSyslog());
