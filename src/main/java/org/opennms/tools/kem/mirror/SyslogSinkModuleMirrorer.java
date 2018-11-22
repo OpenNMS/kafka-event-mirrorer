@@ -32,7 +32,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -97,11 +96,13 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
                     // Includes
                     for (String includeContainingEntry : includeContaining) {
                         if (syslog.contains(includeContainingEntry)) {
+                            logMatch(includeContainingEntry);
                             return true;
                         }
                     }
                     for (Pattern includePattern : includePatterns) {
                         if (includePattern.matcher(syslog).matches()) {
+                            logMatch(includePattern.toString());
                             return true;
                         }
                     }

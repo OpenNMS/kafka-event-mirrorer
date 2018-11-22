@@ -28,10 +28,9 @@
 
 package org.opennms.tools.kem.mirror;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Predicate;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.opennms.core.ipc.sink.api.Message;
@@ -50,12 +49,12 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
     private static final Logger LOG = LoggerFactory.getLogger(TrapSinkModuleMirrorer.class);
 
     private final Traps config;
-    private final List<Predicate<TrapIdentityDTO>> matchers;
+    private final List<TrapMatcher> matchers;
 
     public TrapSinkModuleMirrorer(MetricRegistry metrics, Traps config) {
         super(metrics, TrapLogDTO.class, "traps");
         this.config = Objects.requireNonNull(config);
-        matchers = toPredicates(config.getTrapCriteria());
+        matchers = toMatchers(config.getTrapCriteria());
     }
 
     @Override
@@ -64,7 +63,15 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
 
         // Filter the traps
         final List<TrapDTO> trapsToForward = trapLogDTO.getMessages().stream()
-                .filter(t -> matchers.stream().anyMatch(p -> p.test(t.getTrapIdentity())))
+                .filter(t -> {
+                    final TrapIdentityDTO trapIdentity = t.getTrapIdentity();
+                    final Optional<TrapMatcher> matcher = matchers.stream().filter(m -> m.matches(trapIdentity)).findFirst();
+                    if (!matcher.isPresent()) {
+                        return false;
+                    }
+                    logMatch(matcher.get().getStatKey());
+                    return true;
+                })
                 .collect(Collectors.toList());
 
         // Track the number of traps we did not forward
@@ -105,25 +112,43 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
         return filteredTrapLogDTO;
     }
 
-    private static List<Predicate<TrapIdentityDTO>> toPredicates(List<TrapCriteria> trapCriteria) {
-        final List<Predicate<TrapIdentityDTO>> matchers = new ArrayList<>(trapCriteria.size());
-        for (TrapCriteria criteria : trapCriteria) {
-            final OID enterpriseOid = criteria.getEnterprise() != null ? new OID(criteria.getEnterprise()) : null;
-            if (enterpriseOid == null && criteria.getGeneric() == null && criteria.getSpecific() == null) {
-                // All null, skip it
-                continue;
-            }
-            matchers.add(trapIdentityDTO -> {
-                if (enterpriseOid != null && !Objects.equals(enterpriseOid, new OID(trapIdentityDTO.getEnterpriseId()))) {
-                    return false;
-                }
-                if (criteria.getGeneric() != null && criteria.getGeneric() != trapIdentityDTO.getGeneric()) {
-                    return false;
-                }
-                return criteria.getSpecific() == null || criteria.getSpecific() == trapIdentityDTO.getSpecific();
-            });
+    private static class TrapMatcher {
+        private final TrapCriteria criteria;
+        private final OID enterpriseOid;
+        private final boolean matchNone;
+        private String statKey;
+
+        public TrapMatcher(TrapCriteria criteria) {
+            this.criteria = Objects.requireNonNull(criteria);
+            enterpriseOid = criteria.getEnterprise() != null ? new OID(criteria.getEnterprise()) : null;
+            // If everything is null, match none
+            matchNone = enterpriseOid == null && criteria.getGeneric() == null && criteria.getSpecific() == null;
+            // Compute the stat key
+            statKey = String.format("%s/%d/%d", criteria.getEnterprise(), criteria.getGeneric(), criteria.getSpecific());
         }
-        return matchers;
+
+        public boolean matches(TrapIdentityDTO trapIdentity) {
+            if (matchNone) {
+                return false;
+            }
+            if (enterpriseOid != null && !Objects.equals(enterpriseOid, new OID(trapIdentity.getEnterpriseId()))) {
+                return false;
+            }
+            if (criteria.getGeneric() != null && criteria.getGeneric() != trapIdentity.getGeneric()) {
+                return false;
+            }
+            return criteria.getSpecific() == null || criteria.getSpecific() == trapIdentity.getSpecific();
+        }
+
+        public String getStatKey() {
+            return statKey;
+        }
+    }
+
+    private static List<TrapMatcher> toMatchers(List<TrapCriteria> trapCriteria) {
+        return trapCriteria.stream()
+                .map(TrapMatcher::new)
+                .collect(Collectors.toList());
     }
 
     @Override

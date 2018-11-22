@@ -28,13 +28,16 @@
 
 package org.opennms.tools.kem.mirror;
 
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.opennms.core.ipc.sink.api.Message;
 import org.opennms.core.xml.XmlHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
@@ -48,12 +51,17 @@ public abstract class XmlSinkModuleMirrorer<M extends Message> {
     private final ThreadLocal<XmlHandler<M>> xmlHandlerThreadLocal = new ThreadLocal<>();
 
     private final Class<M> clazz;
+    private final String name;
+    private final MetricRegistry metrics;
     protected final Meter messagesFiltered;
     protected final Meter messagesForwarded;
     protected final Histogram messageSizes;
+    private final Map<String, Counter> countersByStatKey = new ConcurrentHashMap<>();
 
     public XmlSinkModuleMirrorer(MetricRegistry metrics, Class<M> clazz, String name) {
         this.clazz = Objects.requireNonNull(clazz);
+        this.name = name;
+        this.metrics = Objects.requireNonNull(metrics);
         messagesFiltered = metrics.meter(name + "Filtered");
         messagesForwarded = metrics.meter(name + "Forwarded");
         messageSizes = metrics.histogram(name + "MessageSizes");
@@ -96,6 +104,10 @@ public abstract class XmlSinkModuleMirrorer<M extends Message> {
             LOG.warn("Creating the XmlHandler failed. Retrying.", t);
             return new XmlHandler<>(clazz);
         }
+    }
+
+    protected void logMatch(String statKey) {
+        countersByStatKey.computeIfAbsent(statKey, (key) -> metrics.counter(name + "." + statKey)).inc();
     }
 
 }
