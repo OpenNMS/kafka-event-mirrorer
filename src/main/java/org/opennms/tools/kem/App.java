@@ -38,6 +38,7 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.spi.SubCommand;
 import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
+import org.opennms.tools.kem.eval.EvalCommand;
 import org.opennms.tools.kem.mirror.MirrorCommand;
 
 /**
@@ -50,7 +51,8 @@ public class App {
 
     @Argument(handler=SubCommandHandler.class)
     @SubCommands({
-            @SubCommand(name="mirror", impl=MirrorCommand.class)
+            @SubCommand(name="mirror", impl=MirrorCommand.class),
+            @SubCommand(name="eval", impl=EvalCommand.class)
     })
     Command cmd;
 
