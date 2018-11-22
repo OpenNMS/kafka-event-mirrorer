@@ -116,11 +116,14 @@ public class MirrorCommand implements Command {
                     .foreach((k,m) -> producer.send(new ProducerRecord<>(mirrorer.getTargetTopic(), k, mirrorer.marshal(m)), (metadata, exception) -> {
                         if (exception == null) {
                             mirrorer.messagesForwarded.mark(mirrorer.getNumMessagesIn(m));
+                        } else {
+                            LOG.error("Error writing to topic: {}. Message: {}", mirrorer.getTargetTopic(), m, exception);
                         }
                     }));
         }
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), sourceConfiguration);
+        streams.setUncaughtExceptionHandler((t, e) -> LOG.error(String.format("Stream error on thread: %s", t.getName()), e));
         streams.cleanUp();
         streams.start();
 
