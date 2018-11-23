@@ -31,6 +31,7 @@ package org.opennms.tools.kem.mirror;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
 import org.opennms.core.ipc.sink.api.Message;
@@ -67,6 +68,7 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
                     final TrapIdentityDTO trapIdentity = t.getTrapIdentity();
                     final Optional<TrapMatcher> matcher = matchers.stream().filter(m -> m.matches(trapIdentity)).findFirst();
                     if (!matcher.isPresent()) {
+                        logMismatch(getStatKey(trapIdentity));
                         return false;
                     }
                     logMatch(matcher.get().getStatKey());
@@ -149,6 +151,10 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
         return trapCriteria.stream()
                 .map(TrapMatcher::new)
                 .collect(Collectors.toList());
+    }
+
+    private static String getStatKey(TrapIdentityDTO trapIdentity) {
+        return String.format("%s/%s/%s", trapIdentity.getEnterpriseId(), trapIdentity.getGeneric(), trapIdentity.getSpecific());
     }
 
     @Override

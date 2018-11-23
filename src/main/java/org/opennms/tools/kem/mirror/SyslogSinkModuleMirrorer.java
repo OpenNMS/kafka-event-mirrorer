@@ -51,6 +51,7 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
     private static final Logger LOG = LoggerFactory.getLogger(TrapSinkModuleMirrorer.class);
     private final static Pattern MAX_MIN_THRESHOLD_XML_PATTERN = Pattern.compile("<max.*Min>", Pattern.DOTALL | Pattern.MULTILINE);
     private final static Pattern SOURCE_ADDRESS_PATTERN = Pattern.compile(".*(\\s*source_address=(.*))\\s*$", Pattern.DOTALL | Pattern.MULTILINE);
+    private static final Pattern CISCO_SYSLOG_TAG_PATTERN = Pattern.compile(".*(%\\S+)\\s*:.*");
 
     private final Syslog config;
 
@@ -73,6 +74,8 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
         includeContaining = config.getIncludeMessagesContaining();
     }
 
+
+
     @Override
     public SyslogMessageLogDTO mapIfNeedsForwarding(Message message) {
         final SyslogMessageLogDTO syslogMessageLogDTO = (SyslogMessageLogDTO)message;
@@ -84,11 +87,13 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
                     // Excludes
                     for (String excludeContainingEntry : excludeContaining) {
                         if (syslog.contains(excludeContainingEntry)) {
+                            logMismatch(getStatKey(syslog));
                             return false;
                         }
                     }
                     for (Pattern excludePattern : excludePatterns) {
                         if (excludePattern.matcher(syslog).matches()) {
+                            logMismatch(getStatKey(syslog));
                             return false;
                         }
                     }
@@ -187,5 +192,13 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
         return config.getTargetTopic();
     }
 
+    private static String getStatKey(String syslogMessage) {
+        final Matcher m = CISCO_SYSLOG_TAG_PATTERN.matcher(syslogMessage);
+        if (m.matches()) {
+            return m.group(1);
+        } else {
+            return "non-cisco";
+        }
+    }
 
 }

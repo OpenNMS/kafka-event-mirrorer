@@ -107,7 +107,11 @@ public abstract class XmlSinkModuleMirrorer<M extends Message> {
     }
 
     protected void logMatch(String statKey) {
-        countersByStatKey.computeIfAbsent(statKey, (key) -> metrics.counter(name + "." + statKey)).inc();
+        countersByStatKey.computeIfAbsent(statKey, (key) -> metrics.counter("match." + name + "-" + statKey)).inc();
+    }
+
+    protected void logMismatch(String statKey) {
+        countersByStatKey.computeIfAbsent(statKey, (key) -> metrics.counter("mismatch." + name + "-" + statKey)).inc();
     }
 
 }
