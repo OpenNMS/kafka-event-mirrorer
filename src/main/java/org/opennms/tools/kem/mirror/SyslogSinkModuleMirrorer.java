@@ -51,7 +51,7 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
     private static final Logger LOG = LoggerFactory.getLogger(TrapSinkModuleMirrorer.class);
     private final static Pattern MAX_MIN_THRESHOLD_XML_PATTERN = Pattern.compile("<max.*Min>", Pattern.DOTALL | Pattern.MULTILINE);
     private final static Pattern SOURCE_ADDRESS_PATTERN = Pattern.compile(".*(\\s*source_address=(.*))\\s*$", Pattern.DOTALL | Pattern.MULTILINE);
-    private static final Pattern CISCO_SYSLOG_TAG_PATTERN = Pattern.compile(".*(%\\S+)\\s*:.*");
+    private static final Pattern CISCO_SYSLOG_TAG_PATTERN = Pattern.compile(".*(%\\S+)\\s*:.*", Pattern.DOTALL | Pattern.MULTILINE);
 
     private final Syslog config;
 
@@ -192,7 +192,7 @@ public class SyslogSinkModuleMirrorer extends XmlSinkModuleMirrorer<SyslogMessag
         return config.getTargetTopic();
     }
 
-    private static String getStatKey(String syslogMessage) {
+    protected static String getStatKey(String syslogMessage) {
         final Matcher m = CISCO_SYSLOG_TAG_PATTERN.matcher(syslogMessage);
         if (m.matches()) {
             return m.group(1);
