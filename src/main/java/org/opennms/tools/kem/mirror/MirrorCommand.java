@@ -57,6 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.ConsoleReporter;
+import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 
 public class MirrorCommand implements Command {
@@ -67,6 +68,7 @@ public class MirrorCommand implements Command {
     private File configFile = Paths.get(System.getProperty("user.home"), ".kem", "config.yaml").toFile();
 
     private final MetricRegistry metrics = new MetricRegistry();
+    private final Meter errors = metrics.meter("errors");
 
     private List<XmlSinkModuleMirrorer<? extends Message>> mirrorers = new ArrayList<>();
 
@@ -108,6 +110,7 @@ public class MirrorCommand implements Command {
                     lastXmlMessage.put(mirrorer, xml);
                     return mirrorer.mapIfNeedsForwarding(m);
                 } catch (Exception e) {
+                    errors.mark();
                     LOG.error("Failed to unmarshal XML. Skipping record. Value: {}", xml, e);
                     return null;
                 }
@@ -117,13 +120,17 @@ public class MirrorCommand implements Command {
                         if (exception == null) {
                             mirrorer.messagesForwarded.mark(mirrorer.getNumMessagesIn(m));
                         } else {
+                            errors.mark();
                             LOG.error("Error writing to topic: {}. Message: {}", mirrorer.getTargetTopic(), m, exception);
                         }
                     }));
         }
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), sourceConfiguration);
-        streams.setUncaughtExceptionHandler((t, e) -> LOG.error(String.format("Stream error on thread: %s", t.getName()), e));
+        streams.setUncaughtExceptionHandler((t, e) -> {
+            errors.mark();
+            LOG.error(String.format("Stream error on thread: %s", t.getName()), e);
+        });
         streams.cleanUp();
         streams.start();
 

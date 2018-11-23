@@ -133,7 +133,7 @@ public class TrapSinkModuleMirrorer extends XmlSinkModuleMirrorer<TrapLogDTO> {
             if (matchNone) {
                 return false;
             }
-            if (enterpriseOid != null && !Objects.equals(enterpriseOid, new OID(trapIdentity.getEnterpriseId()))) {
+            if (enterpriseOid != null && !Objects.equals(enterpriseOid, trapIdentity.getEnterpriseId() != null ? new OID(trapIdentity.getEnterpriseId()) : null)) {
                 return false;
             }
             if (criteria.getGeneric() != null && criteria.getGeneric() != trapIdentity.getGeneric()) {
