@@ -33,8 +33,7 @@ jobs:
           - v1-dependencies-
 
       - run: |
-           mvn dependency:resolve-plugins
-           mvn dependency:go-offline || true
+           mvn -DskipTests clean install dependency:resolve-plugins dependency:go-offline || true
 
       - save_cache:
           paths:
@@ -48,7 +47,7 @@ jobs:
       - run:
           name: Compile and run the tests
           command: |
-            mvn install test integration-test
+            mvn clean install test integration-test
 
       - run:
           name: Build the RPMs
