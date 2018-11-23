@@ -28,6 +28,7 @@
 
 package org.opennms.tools.kem.config;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -44,7 +45,7 @@ public class Traps {
     @JsonProperty("target-topic")
     private String targetTopic;
     @JsonProperty("include-traps-with")
-    private List<TrapCriteria> trapCriteria;
+    private List<TrapCriteria> trapCriteria = new ArrayList<>();
 
     public boolean isEnabled() {
         return enabled;
