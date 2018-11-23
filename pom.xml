@@ -12,9 +12,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <opennms.version>23.0.0</opennms.version>
         <jackson.version>2.9.6</jackson.version>
-        <kafka.version>1.1.0</kafka.version>
-	<RUNAS>root</RUNAS>
-	<LOGFILE>/var/log/${project.name}.log</LOGFILE>
+        <kafka.version>2.1.0</kafka.version>
+        <RUNAS>opennms-kem</RUNAS>
+        <LOGFILE>/var/log/${project.name}.log</LOGFILE>
     </properties>
 
     <dependencies>
@@ -42,11 +42,73 @@
             <groupId>org.opennms.features.events</groupId>
             <artifactId>org.opennms.features.events.traps</artifactId>
             <version>${opennms.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.opennms.core</groupId>
+                    <artifactId>org.opennms.core.daemon</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms.core</groupId>
+                    <artifactId>org.opennms.core.camel</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms.dependencies</groupId>
+                    <artifactId>camel-dependencies</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms.dependencies</groupId>
+                    <artifactId>owasp-dependencies</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms</groupId>
+                    <artifactId>opennms-model</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms</groupId>
+                    <artifactId>opennms-dao-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.opennms.features.events</groupId>
             <artifactId>org.opennms.features.events.syslog</artifactId>
             <version>${opennms.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.opennms.core</groupId>
+                    <artifactId>org.opennms.core.daemon</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms.core</groupId>
+                    <artifactId>org.opennms.core.camel</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms.dependencies</groupId>
+                    <artifactId>camel-dependencies</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms.dependencies</groupId>
+                    <artifactId>owasp-dependencies</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms</groupId>
+                    <artifactId>opennms-dao-mock</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms</groupId>
+                    <artifactId>opennms-model</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opennms</groupId>
+                    <artifactId>opennms-dao-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.opennms.dependencies</groupId>
+            <artifactId>snmp4j-dependencies</artifactId>
+            <version>${opennms.version}</version>
+            <type>pom</type>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
