@@ -7,7 +7,6 @@
             <fileNamePattern>mirror.%i.log.zip</fileNamePattern>
             <minIndex>1</minIndex>
             <maxIndex>4</maxIndex>
-            <totalSizeCap>500MB</totalSizeCap>
         </rollingPolicy>
         <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
             <maxFileSize>100MB</maxFileSize>
