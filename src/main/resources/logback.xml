@@ -2,9 +2,9 @@
 <configuration>
 
     <appender name="file" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>mirror.log</file>
+        <file>/var/log/kem.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
-            <fileNamePattern>mirror.%i.log.zip</fileNamePattern>
+            <fileNamePattern>/var/log/kem.%i.log.zip</fileNamePattern>
             <minIndex>1</minIndex>
             <maxIndex>4</maxIndex>
         </rollingPolicy>
