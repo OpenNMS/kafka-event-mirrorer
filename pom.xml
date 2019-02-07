@@ -14,7 +14,7 @@
         <jackson.version>2.9.6</jackson.version>
         <kafka.version>2.1.0</kafka.version>
         <RUNAS>opennms-kem</RUNAS>
-        <LOGFILE>/var/log/${project.name}.log</LOGFILE>
+        <LOGFILE>/var/log/${project.name}-output.log</LOGFILE>
     </properties>
 
     <dependencies>
@@ -27,11 +27,6 @@
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
             <version>${kafka.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>1.7.25</version>
         </dependency>
         <dependency>
             <groupId>args4j</groupId>
@@ -139,6 +134,11 @@
             <groupId>org.hamcrest</groupId>
             <artifactId>hamcrest-all</artifactId>
             <version>1.3</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.2.3</version>
         </dependency>
 
         <!-- Test -->
