@@ -37,6 +37,36 @@ Run using:
 java -XX:+UseG1GC -Xms2g -Xmx2g -jar target/kafka-event-mirrorer-1.0.0-SNAPSHOT-jar-with-dependencies.jar mirror
 ```
 
+### Configure logging
+
+Logging configuration can be modified by passing a reference to an external logback confile file using a system property:
+
+```
+java -Dlogback.configurationFile=overridingConfigFile.xml -jar kafka-event-mirrorer-1.0.0-SNAPSHOT-jar-with-dependencies.jar mirror
+```
+
+An example config looks as follows:
+
+```
+<configuration>
+<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+<encoder>
+<pattern>%d
+
+{HH:mm:ss.SSS}
+[%thread] %-5level %logger
+
+{36}
+- %msg%n</pattern>
+</encoder>
+</appender>
+
+<root level="debug">
+<appender-ref ref="STDOUT" />
+</root>
+</configuration>
+```
+
 ## Notes
 
 If you are restarting the client after a long period of being offline, you can reset the offsets using something like:
