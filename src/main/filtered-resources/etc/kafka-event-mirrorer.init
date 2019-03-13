@@ -28,7 +28,7 @@ STOP_WAIT=10
 RUNAS="@RUNAS@"
 PIDFILE="$APP_PREFIX/run/$NAME.pid"
 LOGDIR="/var/log/kem/"
-LOGFILE="$LOGDIR/kem.log"
+LOGFILE="$LOGDIR/kem-output.log"
 
 if [ -f /lib/lsb/init-functions ]; then
 	# shellcheck disable=SC1090,SC1091
