@@ -14,7 +14,6 @@
         <jackson.version>2.9.6</jackson.version>
         <kafka.version>2.1.0</kafka.version>
         <RUNAS>opennms-kem</RUNAS>
-        <LOGFILE>/var/log/${project.name}-output.log</LOGFILE>
     </properties>
 
     <dependencies>

@@ -25,9 +25,10 @@ SYSCONFDIR="@SYSCONFDIR@"
 STOP_RETRIES=3
 STOP_WAIT=10
 
-RUNAS="root"
+RUNAS="@RUNAS@"
 PIDFILE="$APP_PREFIX/run/$NAME.pid"
-LOGFILE="@LOGFILE@"
+LOGDIR="/var/log/kem/"
+LOGFILE="$LOGDIR/kem-output.log"
 
 if [ -f /lib/lsb/init-functions ]; then
 	# shellcheck disable=SC1090,SC1091
@@ -77,6 +78,16 @@ run_java() {
 	START_STOP_DAEMON="$(command -v start-stop-daemon)"
 	RUNUSER="$(runuser -u "$RUNAS" true 2>/dev/null && command -v runuser)"
 	JAVA="$JAVA_HOME/bin/java"
+	if [ ! -d "$LOGDIR" ]; then
+	        mkdir $LOGDIR
+	        chmod 6755 $LOGDIR
+	        chown $RUNAS:$RUNAS $LOGDIR
+	fi
+	if [ ! -f "$LOGFILE" ]; then
+	        touch $LOGFILE
+	        chmod 6755 $LOGFILE
+	        chown $RUNAS:$RUNAS $LOGFILE
+	fi
 	if [ "$(id -n -u)" "!=" "$RUNAS" ]; then
 		if [ -n "$START_STOP_DAEMON" ]; then
 			# shellcheck disable=SC2086
