@@ -85,7 +85,7 @@ run_java() {
 	fi
 	if [ ! -f "$LOGFILE" ]; then
 	        touch $LOGFILE
-	        chmod 6755 $LOGFILE
+	        chmod 6644 $LOGFILE
 	        chown $RUNAS:$RUNAS $LOGFILE
 	fi
 	if [ "$(id -n -u)" "!=" "$RUNAS" ]; then
