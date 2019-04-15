@@ -59,6 +59,7 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Slf4jReporter;
 
 public class MirrorCommand implements Command {
 
@@ -134,7 +135,7 @@ public class MirrorCommand implements Command {
         streams.cleanUp();
         streams.start();
 
-        final ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics)
+        final Slf4jReporter reporter = Slf4jReporter.forRegistry(metrics)
                 .convertRatesTo(TimeUnit.SECONDS)
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .build();
@@ -145,7 +146,7 @@ public class MirrorCommand implements Command {
             @Override
             public void run() {
                 lastXmlMessage.forEach((m,xml) -> {
-                    System.out.printf("\nLast message in '%s':\n%s\n\n", m.getSourceTopic(), xml);
+                    LOG.debug("Last message in '{}': {}", m.getSourceTopic(), xml);
                 });
             }
         }, TimeUnit.SECONDS.toMillis(10), TimeUnit.SECONDS.toMillis(10));
