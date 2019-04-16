@@ -29,19 +29,23 @@
 package org.opennms.tools.kem.mirror;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
@@ -50,6 +54,7 @@ import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.KStream;
 import org.kohsuke.args4j.Option;
 import org.opennms.core.ipc.sink.api.Message;
+import org.opennms.core.ipc.sink.model.SinkMessageProtos;
 import org.opennms.tools.kem.Command;
 import org.opennms.tools.kem.config.KemConfig;
 import org.opennms.tools.kem.config.KemConfigDao;
@@ -60,6 +65,7 @@ import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Slf4jReporter;
+import com.google.protobuf.ByteString;
 
 public class MirrorCommand implements Command {
 
@@ -92,39 +98,57 @@ public class MirrorCommand implements Command {
             return;
         }
 
+        final boolean shouldDecodeFromProtobuf = config.getCompatibility().isDecodeFromProtobuf();
+        final boolean shouldEncodeInProtobuf = config.getCompatibility().isEncodeInProtobuf();
+
         final Properties sourceConfiguration = config.getKafka().getEffectiveSourceConfiguration();
         // Specify default (de)serializers for record keys and for record values.
         sourceConfiguration.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
-        sourceConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+        sourceConfiguration.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArray().getClass().getName());
 
         final Properties targetConfiguration = config.getKafka().getEffectiveTargetConfiguration();
         targetConfiguration.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getCanonicalName());
-        targetConfiguration.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getCanonicalName());
-        final KafkaProducer<String,String> producer = new KafkaProducer<>(targetConfiguration);
+        targetConfiguration.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getCanonicalName());
+        final KafkaProducer<String,byte[]> producer = new KafkaProducer<>(targetConfiguration);
 
         final StreamsBuilder builder = new StreamsBuilder();
         for (XmlSinkModuleMirrorer<?> mirrorer : mirrorers) {
-            final KStream<String, String> xmlStream = builder.stream(mirrorer.getSourceTopic());
-            final KStream<String, Message> messageStream = xmlStream.mapValues((k,xml) -> {
+            final KStream<String, byte[]> inputStream = builder.stream(mirrorer.getSourceTopic());
+            final KStream<String, Message> messageStream = inputStream.mapValues((k,payload) -> {
                 try {
+                    final String xml;
+                    if (shouldDecodeFromProtobuf) {
+                        SinkMessageProtos.SinkMessage msg = SinkMessageProtos.SinkMessage.parseFrom(payload);
+                        xml = msg.getContent().toStringUtf8();
+                    } else {
+                        xml = new String(payload, StandardCharsets.UTF_8);
+                    }
+
                     final Message m = mirrorer.unmarshal(xml);
                     lastXmlMessage.put(mirrorer, xml);
                     return mirrorer.mapIfNeedsForwarding(m);
                 } catch (Exception e) {
                     errors.mark();
-                    LOG.error("Failed to unmarshal XML. Skipping record. Value: {}", xml, e);
+                    LOG.error("Failed to parse payload. Skipping record. Value: {}", Arrays.toString(payload), e);
                     return null;
                 }
             });
             messageStream.filter((k,m) -> m != null)
-                    .foreach((k,m) -> producer.send(new ProducerRecord<>(mirrorer.getTargetTopic(), k, mirrorer.marshal(m)), (metadata, exception) -> {
-                        if (exception == null) {
-                            mirrorer.messagesForwarded.mark(mirrorer.getNumMessagesIn(m));
-                        } else {
-                            errors.mark();
-                            LOG.error("Error writing to topic: {}. Message: {}", mirrorer.getTargetTopic(), m, exception);
+                    .foreach((k,m) -> {
+                        byte[] payload = mirrorer.marshal(m).getBytes(StandardCharsets.UTF_8);
+                        if (shouldEncodeInProtobuf) {
+                            final String messageId = UUID.randomUUID().toString();
+                            payload = wrapMessageInProto(messageId, payload);
                         }
-                    }));
+                        producer.send(new ProducerRecord<>(mirrorer.getTargetTopic(), k, payload), (metadata, exception) -> {
+                            if (exception == null) {
+                                mirrorer.messagesForwarded.mark(mirrorer.getNumMessagesIn(m));
+                            } else {
+                                errors.mark();
+                                LOG.error("Error writing to topic: {}. Message: {}", mirrorer.getTargetTopic(), m, exception);
+                            }
+                        });
+                    });
         }
 
         final KafkaStreams streams = new KafkaStreams(builder.build(), sourceConfiguration);
@@ -158,5 +182,13 @@ public class MirrorCommand implements Command {
             reporter.close();
             timer.cancel();
         }));
+    }
+
+    private byte[] wrapMessageInProto(String messageId, byte[] messageBytes) {
+        SinkMessageProtos.SinkMessage sinkMessage = SinkMessageProtos.SinkMessage.newBuilder()
+                .setMessageId(messageId)
+                .setContent(ByteString.copyFrom(messageBytes))
+                .build();
+        return sinkMessage.toByteArray();
     }
 }

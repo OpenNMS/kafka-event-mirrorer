@@ -1,8 +1,8 @@
 /*******************************************************************************
  * This file is part of OpenNMS(R).
  *
- * Copyright (C) 2018 The OpenNMS Group, Inc.
- * OpenNMS(R) is Copyright (C) 1999-2018 The OpenNMS Group, Inc.
+ * Copyright (C) 2019 The OpenNMS Group, Inc.
+ * OpenNMS(R) is Copyright (C) 1999-2019 The OpenNMS Group, Inc.
  *
  * OpenNMS(R) is a registered trademark of The OpenNMS Group, Inc.
  *
@@ -28,41 +28,27 @@
 
 package org.opennms.tools.kem.config;
 
-public class KemConfig {
-    private Kafka kafka;
-    private Traps traps;
-    private Syslog syslog;
-    private Compatibility compatibility = new Compatibility();
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-    public Kafka getKafka() {
-        return kafka;
+public class Compatibility {
+    @JsonProperty("decode-from-protobuf")
+    private boolean decodeFromProtobuf = false;
+    @JsonProperty("encode-in-protobuf")
+    private boolean encodeInProtobuf = false;
+
+    public boolean isDecodeFromProtobuf() {
+        return decodeFromProtobuf;
     }
 
-    public void setKafka(Kafka kafka) {
-        this.kafka = kafka;
+    public void setDecodeFromProtobuf(boolean decodeFromProtobuf) {
+        this.decodeFromProtobuf = decodeFromProtobuf;
     }
 
-    public Traps getTraps() {
-        return traps;
+    public boolean isEncodeInProtobuf() {
+        return encodeInProtobuf;
     }
 
-    public void setTraps(Traps traps) {
-        this.traps = traps;
-    }
-
-    public Syslog getSyslog() {
-        return syslog;
-    }
-
-    public void setSyslog(Syslog syslog) {
-        this.syslog = syslog;
-    }
-
-    public Compatibility getCompatibility() {
-        return compatibility;
-    }
-
-    public void setCompatibility(Compatibility compatibility) {
-        this.compatibility = compatibility;
+    public void setEncodeInProtobuf(boolean encodeInProtobuf) {
+        this.encodeInProtobuf = encodeInProtobuf;
     }
 }

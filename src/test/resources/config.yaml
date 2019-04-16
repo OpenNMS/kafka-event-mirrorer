@@ -30,3 +30,8 @@ syslog:
     - MGBL-CONFIG-6-DB_COMMIT
   include-messages-containing:
     - MGBL-CONFIG-6-DB_COMMIT
+compatibility:
+  # Optionally decode the payload from the protobuf (use this when the producers are running 24.0.0 or greater)
+  decode-from-protobuf: false
+  # Optionally encode the payload from the protobuf (use this when the consumers are running 24.0.0 or greater)
+  encode-in-protobuf: false
