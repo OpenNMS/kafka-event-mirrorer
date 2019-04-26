@@ -2,7 +2,8 @@ version: 2
 
 jobs:
   build:
-    machine: true
+    docker:
+      - image: circleci/openjdk:8-jdk-stretch-node-browsers
 
     working_directory: /home/circleci/kem
 
