@@ -10,7 +10,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <opennms.version>24.0.0-SNAPSHOT</opennms.version>
+        <opennms.version>24.0.0</opennms.version>
         <jackson.version>2.9.8</jackson.version>
         <kafka.version>2.1.0</kafka.version>
         <RUNAS>opennms-kem</RUNAS>
@@ -284,6 +284,13 @@
             <id>opennms-repo</id>
             <name>OpenNMS Repository</name>
             <url>http://maven.opennms.org/content/groups/opennms.org-release/</url>
+        </repository>
+        <repository>
+            <snapshots><enabled>true</enabled></snapshots>
+            <releases><enabled>false</enabled></releases>
+            <id>opennms-snapshot-repo</id>
+            <name>OpenNMS Snapshot Repository</name>
+            <url>http://maven.opennms.org/content/groups/opennms.org-snapshot/</url>
         </repository>
     </repositories>
 </project>
